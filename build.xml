@@ -1,0 +1,52 @@
+<project name="spreadsheet" default ="dist" basedir="." xmlns:if="ant:if" xmlns:unless="ant:unless">
+    <property name="lib"       location="lib"       />
+    <property name="java"      location="java"      />
+    <property name="classes"   location="target/classes"   />
+    <property name="dist"      location="target/dist"      />
+    <!--property name="test"      location="test"      /-->
+  
+    <!-- initialize the workspace -->
+    <target name="init">
+        <mkdir dir="${classes}" />
+        <mkdir dir="${dist}" />
+    
+    </target>
+  
+    <property environment="env" />
+  
+    <path id="libraries">
+       <fileset dir="${lib}">
+      <include name="**/*.jar" />
+       </fileset>
+    </path>
+    
+    <target name="clean">
+      <delete dir="${classes}" />
+      <delete dir="${dist}" />
+    </target>
+    
+    <target name="compile" depends="init">
+      <javac srcdir="${java}" destdir="${classes}" verbose="off" listfiles="off" debug="on">
+        <classpath refid="libraries"/>
+      </javac>
+      <copy todir="${dist}">
+        <fileset dir="${lib}" includes="**/**.jar"/>
+       </copy>
+    </target>
+  
+    <target name="dist" depends="compile">
+     <jar jarfile="${dist}/spreadsheet.jar" basedir="${classes}">
+        <manifest>
+          <attribute name="Main-Class" value="schule.Spreadsheet" />
+           <attribute name="Class-Path" value="lanterna-3.1.1.jar" />
+        </manifest>
+      </jar>
+    </target>
+    <target name="run" depends="dist">
+
+      <java jar="target/dist/spreadsheet.jar" fork="true">
+        <classpath refid="libraries"/>
+      </java>
+    </target> 
+  </project>
+  
