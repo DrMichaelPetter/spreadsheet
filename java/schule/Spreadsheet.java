@@ -127,7 +127,7 @@ public class Spreadsheet {
         var cell = "Current Cell "+((char)(cursorcol+'A'))+(cursorrow+1)+": ";
         var raw = getFormula(cursorrow,cursorcol);
         var bo = new ByteArrayOutputStream();
-        if (raw.isPresent()) raw.get().replicateTo(new PrintStream(bo));
+        raw.ifPresent(x -> x.replicateTo(new PrintStream(bo)));
         cell+="="+bo.toString();
         textGraphics.putString(1,2*(ROWS+2),cell);
         // cursor to indicate readyness for new input
@@ -139,7 +139,8 @@ public class Spreadsheet {
         var pw = new PrintWriter(new File(filename));
         for (var r:formulae){
             pw.println(Arrays.stream(r)
-                .map(x->(x.isPresent())?("="+x.get().toString()):"")
+                .filter(x->x.isPresent())
+                .map(x->"="+x.get().toString())
                 .collect(Collectors.joining(";")));
         }
         pw.close();
