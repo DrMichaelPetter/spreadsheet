@@ -259,7 +259,7 @@ public class Spreadsheet {
             if (line==null) sb.append("\n");
             else {
                 var zeile = Arrays.stream(line)
-                    .map(c -> (c!=null && c.isPresent())?String.format("%"+3+"d",c.get()):"   ")
+                    .map(c -> c.map(cc->String.format("%"+3+"d",cc)).orElse("   "))
                     .collect(Collectors.joining(" - "));
                 sb.append(zeile+"\n");
             }
