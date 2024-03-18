@@ -254,16 +254,13 @@ public class Spreadsheet {
    }
    @Override
    public String toString() {
-        var sb  = new StringBuffer();
-        for (var line : values) {
-            if (line==null) sb.append("\n");
-            else {
-                var zeile = Arrays.stream(line)
-                    .map(c -> c.map(cc->String.format("%"+3+"d",cc)).orElse("   "))
-                    .collect(Collectors.joining(" - "));
-                sb.append(zeile+"\n");
-            }
-        }
-        return sb.toString();
+       return Arrays.stream(values)
+               .map(line -> Optional.ofNullable(line)
+                       .map(line2 -> Arrays.stream(line2)
+                               .map(c -> c.map(cc -> String.format("%" + 3 + "d", cc))
+                               .orElse("   "))
+                               .collect(Collectors.joining(" - ")))
+                       .orElse(""))
+               .collect(Collectors.joining("\n"));
    }
 }  
