@@ -4,7 +4,9 @@ import java.io.PrintStream;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
+import java.util.Stack;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -121,6 +123,17 @@ public abstract class Expr {
             return "("+name+"("+p+"))";
         }
     }
+
+    public static Expr shuntyard(String expression) throws Parser.Fail {
+        var tokenstream = scan(expression);
+        // we sort out all the pesky whitespaces
+        tokenstream = tokenstream.stream()
+            .filter(c->c.type!=TokenType.WHITESPACE)
+            .collect(Collectors.toList());
+        var s = new Shuntyard(tokenstream);
+        return s.expr();
+    }
+
     public static Expr parse(String expression)throws Parser.Fail {
         var tokenstream = scan(expression);
         // we sort out all the pesky whitespaces
@@ -321,5 +334,87 @@ public abstract class Expr {
         private String NAME() throws Fail {
             return consume(TokenType.NAME).input();
         }
+    }
+    /**
+     * Shuntyard algorithm for converting infix expressions to postfix notation
+     */
+    public static class Shuntyard {
+        private List<Token> terminals;
+        public Shuntyard(List<Token> terminals){
+            this.terminals=terminals;
+        }
+        public Expr expr(){
+            Queue<Token> output = new LinkedList<>();
+            Stack<Token> operators = new Stack<>();
+            strm: for (var t:terminals){
+                System.out.println();
+                System.out.print("operators: ");operators.forEach(x->System.out.print(x.input()+" "));System.out.println();
+                System.out.print("output: ");output.forEach(x->System.out.print(x.input()+" "));System.out.println();
+                switch (t.type()){
+                    case INTCONST:  output.offer(t); break;
+                    case REF:       output.offer(t); break;
+                    case ADDOP: // prefer * over +
+                        while (!operators.isEmpty() && operators.peek().type()==TokenType.MULOP){
+                            output.offer(operators.pop());
+                        }
+                    case MULOP:    operators.push(t); break;
+                    case EOF:
+                        while (!operators.empty())
+                            output.offer(operators.pop());
+                        break strm;
+                    // section for handling bracket expressions, managing priorities
+                    case LBRACK:   operators.push(t); break;
+                    case RBRACK: // basically a mini EOF, with a special case for function calls
+                        while (!operators.isEmpty() && operators.peek().type()!=TokenType.LBRACK){
+                            var tok = operators.pop();
+                            System.out.print(tok.input()+" ");
+                            output.offer(tok);
+                        }
+                        operators.pop(); // discard the LBRACK
+                        // function call name here:
+                        if (!operators.isEmpty() && operators.peek().type()==TokenType.NAME) 
+                            output.offer(operators.pop());
+                        break;
+                    // function call stuff
+                    case COMMA: // basically a mini EOF
+                        while (!operators.isEmpty() && operators.peek().type()!=TokenType.LBRACK){
+                            output.offer(operators.pop());
+                        }
+                        break;
+                    case NAME:       operators.push(t); break;
+                    default: break;
+                }
+            }
+
+            System.out.print("output: ");output.forEach(x->System.out.print(x.input()+" "));System.out.println();
+
+            // build up actual expression tree from postfix notation
+            Stack<Expr> backlog = new Stack<>();
+            for (var t:output){
+                switch (t.type()){
+                    case INTCONST: backlog.push(new Const(Integer.parseInt(t.input()))); break;
+                    case REF:      backlog.push(new Ref(t.input())); break;
+                    case ADDOP:
+                    case MULOP:
+                        var r = backlog.pop();
+                        var l = backlog.pop();
+                        backlog.push(new BinEx(l,t.input(),r));
+                        break;
+                    case NAME:
+                        List<Expr> params = new LinkedList<>();
+                        // TODO pop more then one parameter from the backlog; we need a way of getting the arity of each function name; not modelled here!
+                        var p = backlog.pop();
+                        params.add(p);
+                        backlog.push(new CallEx(t.input(), params));
+                    default: break;
+                }
+            }
+
+            return backlog.pop();
+        }
+    }
+    public static void main(String[] args) {
+        var shunt = new Shuntyard(scan("A1+2/fun(3+5)")).expr();
+        shunt.replicateTo(System.out);
     }
 }
