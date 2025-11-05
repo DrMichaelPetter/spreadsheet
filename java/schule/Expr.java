@@ -7,11 +7,24 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.Stack;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public abstract class Expr {
-    public int eval(Spreadsheet sheet)throws Exception {
+    interface Context {
+        default int eval(int row,int col,Set<Expr> evalset) throws Exception {
+            return 0;
+        };
+        default Function<List<Integer>,Integer> lookupFunction(String name) {
+            return null;
+        };
+        default int lookupVariable(String name) {
+            return 0;
+        };
+
+    }
+    public int eval(Context sheet)throws Exception {
         return eval(sheet,new HashSet<Expr>());
     }
     /**
@@ -21,7 +34,7 @@ public abstract class Expr {
      * @return
      * @throws Exception
      */
-    public abstract int eval(Spreadsheet sheet,Set<Expr> evalset) throws Exception;    
+    public abstract int eval(Context sheet,Set<Expr> evalset) throws Exception;    
     /**
      * puts a String representation of this expression as a formula on the stream
      * @param stream
@@ -30,7 +43,7 @@ public abstract class Expr {
     public static class Const extends Expr{
         int value;
         @Override
-        public int eval(Spreadsheet sheet,Set<Expr> evalset) {
+        public int eval(Context sheet,Set<Expr> evalset) {
             return value;
         }
         public Const(int val){
@@ -45,10 +58,28 @@ public abstract class Expr {
             return ""+value;
         }
     }
+    public static class Var extends Expr {
+        String name;
+        @Override
+        public int eval(Context sheet,Set<Expr> evalset) {
+            return sheet.lookupVariable(name);
+        }
+        public Var(String name){
+            this.name=name;
+        }
+        @Override
+        public void replicateTo(PrintStream stream) {
+            stream.print(name);
+        }
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
     public static class Ref extends Expr {
         int col,row;
         @Override
-        public int eval(Spreadsheet sheet,Set<Expr> evalset) throws Exception{
+        public int eval(Context sheet,Set<Expr> evalset) throws Exception{
             return sheet.eval(row,col,evalset);
         }
         public Ref(String ref){
@@ -68,7 +99,7 @@ public abstract class Expr {
         Expr l,r;
         String op;
         @Override
-        public int eval(Spreadsheet sheet,Set<Expr> evalset) throws Exception {
+        public int eval(Context sheet,Set<Expr> evalset) throws Exception {
             switch (op){
                 case "+": return l.eval(sheet,evalset) + r.eval(sheet,evalset);
                 case "*": return l.eval(sheet,evalset) * r.eval(sheet,evalset);
@@ -99,7 +130,7 @@ public abstract class Expr {
             this.params=params;
         }
         @Override
-        public int eval(Spreadsheet sheet,Set<Expr> evalset) throws Exception {
+        public int eval(Context sheet,Set<Expr> evalset) throws Exception {
             List<Integer> l = new LinkedList<>();
             for (var e:params){
                 l.add(e.eval(sheet, evalset));
@@ -258,10 +289,14 @@ public abstract class Expr {
         public Expr expr() throws Fail {
             return e();
         }
-// C -> name ( C , ... )
+// C -> name | name ( C , ... )
         private Expr c() throws Fail {
             var name=NAME();
             List<Expr> params=new LinkedList<Expr>();
+            if (peek()!=TokenType.LBRACK) {
+                // just a variable reference
+                return new Var(name);
+            }
             consume(TokenType.LBRACK);
             while (peek()!=TokenType.RBRACK) { 
                 params.add(e());

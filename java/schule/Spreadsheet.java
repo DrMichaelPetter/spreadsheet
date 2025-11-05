@@ -33,7 +33,7 @@ import com.googlecode.lanterna.screen.Screen;
 import com.googlecode.lanterna.screen.TerminalScreen;
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
 
-public class Spreadsheet {
+public class Spreadsheet implements Expr.Context {
     public static final int DIGITS=3;
     public static final int ROWS=16;
     public static final int COLS=ROWS;
