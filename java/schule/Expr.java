@@ -187,7 +187,7 @@ public abstract class Expr {
         // repeat process as long as there is input to be scanned
         scanning: while (expression.length()>0){
             // iterate through all token types
-            tokens: for (var tok:TokenType.values()) {
+            for (var tok:TokenType.values()) {
                 // build a matcher for the current pattern
                 var patty = tok.getPattern();
                 var matchy = patty.matcher(expression);

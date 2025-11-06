@@ -209,7 +209,7 @@ public class Spreadsheet implements Expr.Context {
         var result = new Spreadsheet();
         var buffy = new BufferedReader(new FileReader(filename));
         var row =0;
-        while (buffy.ready() && row < result.ROWS) {
+        while (buffy.ready() && row < Spreadsheet.ROWS) {
             var scanner = new Scanner(buffy.readLine()).useDelimiter(";");
             var col = 0;
             while(scanner.hasNext()){
