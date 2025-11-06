@@ -155,13 +155,13 @@ public abstract class Expr {
         }
     }
 
-    public static Expr shuntyard(String expression) throws Parser.Fail {
+    public static Expr shuntyard(String expression, Context ctx) throws Parser.Fail {
         var tokenstream = scan(expression);
         // we sort out all the pesky whitespaces
         tokenstream = tokenstream.stream()
             .filter(c->c.type!=TokenType.WHITESPACE)
             .collect(Collectors.toList());
-        var s = new Shuntyard(tokenstream);
+        var s = new Shuntyard(tokenstream,ctx);
         return s.expr();
     }
 
@@ -375,16 +375,15 @@ public abstract class Expr {
      */
     public static class Shuntyard {
         private List<Token> terminals;
-        public Shuntyard(List<Token> terminals){
+        private Context ctx;
+        public Shuntyard(List<Token> terminals,Context ctx){
             this.terminals=terminals;
+            this.ctx=ctx;    
         }
         public Expr expr(){
             Queue<Token> output = new LinkedList<>();
             Stack<Token> operators = new Stack<>();
             strm: for (var t:terminals){
-                System.out.println();
-                System.out.print("operators: ");operators.forEach(x->System.out.print(x.input()+" "));System.out.println();
-                System.out.print("output: ");output.forEach(x->System.out.print(x.input()+" "));System.out.println();
                 switch (t.type()){
                     case INTCONST:  output.offer(t); break;
                     case REF:       output.offer(t); break;
@@ -394,7 +393,7 @@ public abstract class Expr {
                         }
                     case MULOP:    operators.push(t); break;
                     case EOF:
-                        while (!operators.empty())
+                        while (!operators.isEmpty())
                             output.offer(operators.pop());
                         break strm;
                     // section for handling bracket expressions, managing priorities
@@ -402,7 +401,6 @@ public abstract class Expr {
                     case RBRACK: // basically a mini EOF, with a special case for function calls
                         while (!operators.isEmpty() && operators.peek().type()!=TokenType.LBRACK){
                             var tok = operators.pop();
-                            System.out.print(tok.input()+" ");
                             output.offer(tok);
                         }
                         operators.pop(); // discard the LBRACK
@@ -416,31 +414,44 @@ public abstract class Expr {
                             output.offer(operators.pop());
                         }
                         break;
-                    case NAME:       operators.push(t); break;
+                    case NAME:   
+                        if (ctx.lookupFunction(t.input()) != null) 
+                            operators.push(t); 
+                        else  
+                            output.offer(t);
+                        
                     default: break;
                 }
             }
 
-            System.out.print("output: ");output.forEach(x->System.out.print(x.input()+" "));System.out.println();
+            
 
             // build up actual expression tree from postfix notation
-            Stack<Expr> backlog = new Stack<>();
+            var backlog = new Stack<Expr>();
+            System.out.println("Postfix output: " + java.util.Arrays.toString(output.toArray()));
             for (var t:output){
+                // print all elements in backlog
+                System.out.println("Backlog: " + java.util.Arrays.toString(backlog.toArray()));
                 switch (t.type()){
                     case INTCONST: backlog.push(new Const(Integer.parseInt(t.input()))); break;
                     case REF:      backlog.push(new Ref(t.input())); break;
                     case ADDOP:
                     case MULOP:
-                        var r = backlog.pop();
-                        var l = backlog.pop();
+                        Expr r = backlog.pop(), l = backlog.pop();
                         backlog.push(new BinEx(l,t.input(),r));
                         break;
                     case NAME:
                         List<Expr> params = new LinkedList<>();
-                        // TODO pop more then one parameter from the backlog; we need a way of getting the arity of each function name; not modelled here!
-                        var p = backlog.pop();
-                        params.add(p);
-                        backlog.push(new CallEx(t.input(), params));
+                        if (ctx.lookupFunction(t.input())!=null) {
+                            var p = backlog.pop();
+                            params.add(p);
+                            backlog.push(new CallEx(t.input(), params));
+                        }
+                        else {
+                            // no parameters
+                            backlog.push(new Var(t.input()));
+                        }
+                       
                     default: break;
                 }
             }
@@ -449,7 +460,10 @@ public abstract class Expr {
         }
     }
     public static void main(String[] args) {
-        var shunt = new Shuntyard(scan("A1+2/fun(3+5)")).expr();
-        shunt.replicateTo(System.out);
+        Context ctx = new Context(){};
+        var shunt = new Shuntyard(scan("(A1+2/fun(3+5))+a"),ctx).expr();
+        shunt.replicateTo(System.out);System.out.println();
+        shunt = new Shuntyard(scan("A1+2/3+5*const"),ctx).expr();
+        shunt.replicateTo(System.out);System.out.println();
     }
 }
